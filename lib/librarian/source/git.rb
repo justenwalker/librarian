@@ -82,16 +82,14 @@ module Librarian
           repository.clone!(uri)
           raise Error, "failed to clone #{uri}" unless repository.git?
         end
+
         repository.reset_hard!
         repository.clean!
+
+        self.sha = fetch_hash unless sha
+
         unless repository.checked_out?(sha)
-          remote = repository.default_remote
-          repository.fetch!(remote)
-          repository.fetch!(remote, :tags => true)
-
-          self.sha = repository.hash_from(remote, ref) unless sha
-          repository.checkout!(sha) unless repository.checked_out?(sha)
-
+          repository.checkout!(sha)
           raise Error, "failed to checkout #{sha}" unless repository.checked_out?(sha)
         end
       end
@@ -100,6 +98,10 @@ module Librarian
 
       attr_accessor :repository_cached
       alias repository_cached? repository_cached
+
+      class << self
+        attr_accessor :hash_cache
+      end
 
       def repository_cached!
         self.repository_cached = true
@@ -119,6 +121,18 @@ module Librarian
 
       def filesystem_path
         @filesystem_path ||= path ? repository.path.join(path) : repository.path
+      end
+
+      def fetch_hash
+        self.class.hash_cache ||= {}
+        remote = repository.default_remote
+        cache_key = [uri, remote, ref]
+
+        self.class.hash_cache[cache_key] ||= lambda {
+          repository.fetch!(remote)
+          repository.fetch!(remote, :tags => true)
+          repository.hash_from(remote, ref)
+        }.call
       end
 
       def cache_key

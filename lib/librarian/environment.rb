@@ -178,6 +178,11 @@ module Librarian
       "#<#{self.class}:0x#{__id__.to_s(16)}>"
     end
 
+    def cache(key, getter)
+      @cache ||= {}
+      @cache[key] ||= getter.call
+    end
+
   private
 
     def environment
